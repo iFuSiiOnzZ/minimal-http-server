@@ -17,9 +17,6 @@ void badRequest(int client)
 	
 	sz = sprintf(buf, "<html><title>Bad Request</title><body><p>Your browser sent a bad request</p></body></html>");
 	send(client, buf, sz, 0);
-	
-	sz = sprintf(buf, "\r\n");
-	send(client, buf, sz, 0);
 }
 
 void notFound(int client)
