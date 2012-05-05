@@ -6,22 +6,21 @@ int requestMethod(char *method, int sockID)
 	int OK = 1;
 
 	if(strcmp("GET", method))
-    {
-    	printf("%s\n", method);
-        if(!strcmp("POST", method))
-        {
-            notImplemented((int) sockID);
-        }
-        else
-        {
-            badRequest((int) sockID);
-        }
+	{
+		if(!strcmp("POST", method))
+		{
+			notImplemented((int) sockID);
+		}
+		else
+		{
+			badRequest((int) sockID);
+		}
 
-        close(sockID);
-        OK = -1;
-    }
+		close(sockID);
+		OK = -1;
+	}
 
-    return(OK);
+	return(OK);
 }
 
 FILE *openFile(char *fileName, int sockID)
@@ -64,7 +63,7 @@ void acceptPetition(long sockID)
     {
     	pthread_exit(NULL);
     }
-            
+
     cType(hdr.uri, ctype);
     fileFound((int) sockID, ctype);
     int sz = 0;
