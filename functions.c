@@ -28,19 +28,19 @@ FILE *openFile(char *fileName, int sockID)
 	FILE *pFile = NULL;
 
 	if((pFile = fopen(fileName, "r")) == NULL)
-    {
-        if(errno == EACCES)
-        {
-            forbidden((int) sockID);
-        }
-        else
-        {
-            notFound((int) sockID);
-        }
-        close(sockID);
-    }
+	{
+		if(errno == EACCES)
+		{
+			forbidden((int) sockID);
+		}
+		else
+		{
+			notFound((int) sockID);
+		}
+		close(sockID);
+	}
 
-    return(pFile);
+	return(pFile);
 }
 
 void acceptPetition(long sockID)
