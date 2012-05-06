@@ -84,7 +84,7 @@ void getHeader(struct headers *hdr, int sockID)
 	int c = '\n';
 	memset(hdr, 0, sizeof(struct headers));
 
-	for(i = 0; i < HDR_METODE_SZ && (recv(sockID, &c, 1, 0) !> 0) && (c != ' ' && c != '\n'); i++)
+	for(i = 0; (i < HDR_METODE_SZ) && (recv(sockID, &c, 1, 0) > 0) && (c != ' ' && c != '\n'); i++)
 	{
 		if(c != '\r')
 		{
@@ -92,7 +92,7 @@ void getHeader(struct headers *hdr, int sockID)
 		}
 	}
 
-	for(i = 0; i < HDR_URI_SZ && (recv(sockID, &c, 1, 0) > 0) && (c != ' ' && c != '\n'); i++)
+	for(i = 0; (i < HDR_URI_SZ) && (recv(sockID, &c, 1, 0) > 0) && (c != ' ' && c != '\n'); i++)
 	{
 		if(c != '\r')
 		{
@@ -112,7 +112,7 @@ void getHeader(struct headers *hdr, int sockID)
 		strncpy(hdr->uri, HTM_INDEX, HDR_URI_SZ - 1);
 	}
 
-	for(i = 0; i < HDR_VERSION_SZ && (recv(sockID, &c, 1, 0) > 0) && (c != ' ' && c != '\n'); i++)
+	for(i = 0; (i < HDR_VERSION_SZ) && (recv(sockID, &c, 1, 0) > 0) && (c != ' ' && c != '\n'); i++)
 	{
 		if(c != '\r')
 		{

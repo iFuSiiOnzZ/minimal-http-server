@@ -7,7 +7,7 @@
 	
 
 	#define HDR_URI_SZ      100
-	#define HDR_METODE_SZ   4
+	#define HDR_METODE_SZ   5
 	#define HDR_VERSION_SZ  10
 
 	#define MAX_BUFFER      1024

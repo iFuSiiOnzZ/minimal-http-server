@@ -25,7 +25,7 @@ void notImplemented(int client)
 	char buf[MAX_BUFFER];
 	memset(buf, 0, (size_t) MAX_BUFFER);
 
-	sz = snprintf(buf, (size_t) MAX_BUFFER, "HTTP/1.0 501 Not Implemente\r\n");
+	sz = snprintf(buf, (size_t) MAX_BUFFER, "HTTP/1.0 501 Not Implemented\r\n");
 	send(client, buf, sz, 0);
 	
 	sz = snprintf(buf, (size_t) MAX_BUFFER, "Content-type: text/html\r\n");
@@ -34,7 +34,7 @@ void notImplemented(int client)
 	sz = snprintf(buf, (size_t) MAX_BUFFER, "\r\n");
 	send(client, buf, sz, 0);
 	
-	sz = snprintf(buf, (size_t) MAX_BUFFER, "<html><title>Forbidden</title><body><p>The server either does not recognise the request method, or it lacks the ability to fulfill the request.</p></body></html>");
+	sz = snprintf(buf, (size_t) MAX_BUFFER, "<html><title>Not Implemented</title><body><p>The server either does not recognise the request method, or it lacks the ability to fulfill the request.</p></body></html>");
 	send(client, buf, sz, 0);
 }
 
