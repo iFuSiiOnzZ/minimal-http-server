@@ -23,11 +23,45 @@ int requestMethod(char *method, int sockID)
 	return(OK);
 }
 
-FILE *openFile(char *fileName, int sockID)
+void acceptPetition(long sockID)
 {
-	FILE *pFile = NULL;
+	struct headers hdr;
+	getHeader(&hdr, (int)sockID);
 
-	if((pFile = fopen(fileName, "r")) == NULL)
+	if(requestMethod(hdr.metode, sockID) != -1)
+	{	
+		if(getFDType(hdr.uri) == FILES)
+		{
+			sendFile(hdr.uri, (int) sockID);
+		}
+		else if(getFDType(hdr.uri) == DIRS)
+		{
+			sendDir(hdr.uri, (int) sockID);
+		}
+		else
+		{
+			notFound((int) sockID);
+		}
+	}
+	else
+	{
+		notImplemented((int) sockID);
+	}
+
+	close((int) sockID);
+	pthread_exit(NULL);
+}
+
+void sendFile(char *file, int sockID)
+{
+	int sz = 0;
+	FILE *pFile = NULL;
+	char buffer[MAX_BUFFER];
+
+	memset(buffer, 0, MAX_BUFFER);
+	fileFound((int) sockID, cType(file));
+
+	if((pFile = fopen(file, "r")) == NULL)
 	{
 		if(errno == EACCES)
 		{
@@ -35,54 +69,68 @@ FILE *openFile(char *fileName, int sockID)
 		}
 		else
 		{
-			notFound((int) sockID);
+			sz = snprintf(buffer, MAX_BUFFER, "Error unexpected end of transmission");
+			send(sockID, buffer, sz, 0);
 		}
-		close(sockID);
-	}
 
-	return(pFile);
-}
-
-void acceptPetition(long sockID)
-{
-	struct headers hdr;
-	char buffer[MAX_BUFFER];
-	char ctype[MAX_CTYPE];
-	FILE *pFile = NULL;
-
-	memset(ctype, 0, MAX_CTYPE);
-	memset(buffer, 0, MAX_BUFFER);
-	getHeader(&hdr, (int)sockID);
-
-	if(requestMethod(hdr.metode, sockID) == -1)
-	{
+		close((int) sockID);
 		pthread_exit(NULL);
 	}
-
-	if((pFile = openFile(hdr.uri, sockID)) == NULL)
-	{
-		pthread_exit(NULL);
-	}
-
-	cType(hdr.uri, ctype);
-	fileFound((int) sockID, ctype);
-	int sz = 0;
-
+	
 	while((sz = fread(buffer, 1, MAX_BUFFER, pFile)) > 0)
 	{
 		send(sockID, buffer, sz, 0);
 	}
 
 	fclose(pFile);
-	close((int) sockID);
-	pthread_exit(NULL);
+}
+
+void sendDir(char *dr, int sockID)
+{
+	int sz = 0;
+	DIR *dir = NULL;
+	struct dirent *myDir;
+	char buffer[MAX_BUFFER];
+
+	memset(buffer, 0, MAX_BUFFER);
+	fileFound((int) sockID, "text/html");
+
+	if((dir = opendir(dr)) == NULL )
+	{
+		if(errno == EACCES)
+		{
+			forbidden((int) sockID);
+		}
+		else
+		{
+			sz = snprintf(buffer, MAX_BUFFER, "Error unexpected end of transmission");
+			send(sockID, buffer, sz, 0);
+		}
+		
+		close((int) sockID);
+		pthread_exit(NULL);
+	}
+
+	while((myDir = readdir(dir)) != NULL)
+	{
+		if(strcmp(myDir->d_name, ".") != 0 && strcmp(myDir->d_name, "..") != 0)
+		{
+			sz = snprintf(buffer, MAX_BUFFER, "<a href=\"%s\">%s</a><br />", myDir->d_name, myDir->d_name);
+			send(sockID, buffer, sz, 0);
+		}
+	}
+
+	closedir(dir);
 }
 
 void getHeader(struct headers *hdr, int sockID)
 {
 	int i = 0;
+	int j = 0;
 	int c = '\n';
+
 	memset(hdr, 0, sizeof(struct headers));
+	getcwd(hdr->uri, HDR_URI_SZ);
 
 	for(i = 0; (i < HDR_METODE_SZ) && (recv(sockID, &c, 1, 0) > 0) && (c != ' ' && c != '\n'); i++)
 	{
@@ -92,7 +140,7 @@ void getHeader(struct headers *hdr, int sockID)
 		}
 	}
 
-	for(i = 0; (i < HDR_URI_SZ) && (recv(sockID, &c, 1, 0) > 0) && (c != ' ' && c != '\n'); i++)
+	for(i = strlen(hdr->uri), j = i; (i < HDR_URI_SZ) && (recv(sockID, &c, 1, 0) > 0) && (c != ' ' && c != '\n'); i++)
 	{
 		if(c != '\r')
 		{
@@ -100,18 +148,11 @@ void getHeader(struct headers *hdr, int sockID)
 		}
 	}
 
-	if(strlen(hdr->uri) > 1)
+	/*if( i == j + 1)
 	{
-		for(i = 0; i < strlen(hdr->uri); i++)
-		{
-			hdr->uri[i] = hdr->uri[i + 1];
-		}
-	}
-	else
-	{
-		strncpy(hdr->uri, HTM_INDEX, HDR_URI_SZ - 1);
-	}
-
+		strncat(hdr->uri, HTM_INDEX, HDR_URI_SZ - 1);
+	}*/
+	
 	for(i = 0; (i < HDR_VERSION_SZ) && (recv(sockID, &c, 1, 0) > 0) && (c != ' ' && c != '\n'); i++)
 	{
 		if(c != '\r')
@@ -121,30 +162,65 @@ void getHeader(struct headers *hdr, int sockID)
 	}
 }
 
-void cType(char *fileName, char *cType)
+char *cType(char *fileName)
 {
 	char *c = strrchr(fileName, '.');
-	char ext[5]; memset(ext, 0, 5);
+	
+	if(c == NULL)
+	{
+		return("text/plain");
+	}
+
+	char ext[5]; 
+	memset(ext, 0, 5);
 	strncpy(ext, c + 1, 4);
 
 	if(!strcmp(ext, "htm") || !strcmp(ext, "html"))
 	{
-		strcat(cType, "text/html");
-	}
-	else if(!strcmp(ext,"gif"))
-	{
-		strcat(cType, "image/gif");
+		return("text/html");
 	}
 	else if(!strcmp(ext,"jpg") || !strcmp(ext, "jpeg"))
 	{
-		strcat(cType, "image/jpeg");
+		return("image/jpeg");
+	}
+	else if(!strcmp(ext,"gif"))
+	{
+		return("image/gif");
 	}
 	else if(!strcmp(ext,"png"))
 	{
-		strcat(cType, "image/png");
+		return("image/png");
 	}
-	else if(!strcmp(ext,"txt"))
+	else
 	{
-		strcat(cType, "text/plain");
+		return("text/plain");
 	}
+}
+
+int getFDType(char *path)
+{
+	struct stat st;
+	enum FD_TYPES fd;
+
+	if(stat(path,&st) == 0)
+	{
+		if(st.st_mode & S_IFDIR)
+		{
+			fd = DIRS;
+		}
+		else if(st.st_mode & S_IFREG)
+		{
+			fd = FILES;
+		}
+		else
+		{
+			fd = ELSE;
+		}
+	}
+	else
+	{
+		fd = ERROR;
+	}
+
+	return(fd);
 }
