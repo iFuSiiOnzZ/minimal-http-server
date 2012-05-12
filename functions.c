@@ -91,8 +91,10 @@ void sendDir(char *dr, int sockID)
 	DIR *dir = NULL;
 	struct dirent *myDir;
 	char buffer[MAX_BUFFER];
+	char curentDir[MAX_BUFFER];
 
 	memset(buffer, 0, MAX_BUFFER);
+	memset(curentDir, 0, MAX_BUFFER);
 	fileFound((int) sockID, "text/html");
 
 	if((dir = opendir(dr)) == NULL )
@@ -111,11 +113,12 @@ void sendDir(char *dr, int sockID)
 		pthread_exit(NULL);
 	}
 
+	getcwd(curentDir, MAX_BUFFER);
 	while((myDir = readdir(dir)) != NULL)
 	{
 		if(strcmp(myDir->d_name, ".") != 0 && strcmp(myDir->d_name, "..") != 0)
 		{
-			sz = snprintf(buffer, MAX_BUFFER, "<a href=\"%s\">%s</a><br />", myDir->d_name, myDir->d_name);
+			sz = snprintf(buffer, MAX_BUFFER, "<a href=\"%s/%s\">%s</a><br />", (strlen(dr + strlen(curentDir)) > 1)? dr + strlen(curentDir) : "", myDir->d_name, myDir->d_name);
 			send(sockID, buffer, sz, 0);
 		}
 	}
@@ -148,11 +151,6 @@ void getHeader(struct headers *hdr, int sockID)
 		}
 	}
 
-	/*if( i == j + 1)
-	{
-		strncat(hdr->uri, HTM_INDEX, HDR_URI_SZ - 1);
-	}*/
-	
 	for(i = 0; (i < HDR_VERSION_SZ) && (recv(sockID, &c, 1, 0) > 0) && (c != ' ' && c != '\n'); i++)
 	{
 		if(c != '\r')
