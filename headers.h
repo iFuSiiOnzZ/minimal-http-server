@@ -1,9 +1,6 @@
 #ifndef _HEADERS_H_
 	#define _HEADERS_H_
-
-	#include <stdio.h>
-	#include <string.h>
-
+	
 	#define MAX_BUFFER	1024
 	#define MAX_CTYPE	50
 

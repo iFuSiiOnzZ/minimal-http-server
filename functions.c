@@ -1,6 +1,18 @@
 #include "functions.h"
 #include "headers.h"
 
+#include <netinet/in.h>
+#include <sys/stat.h>
+
+#include <pthread.h>
+#include <string.h>
+#include <dirent.h>
+#include <stdio.h>
+#include <errno.h>
+	
+#include <fcntl.h>
+#include <unistd.h>
+
 int requestMethod(char *method, int sockID)
 {
 	int OK = 1;
@@ -16,6 +28,7 @@ int requestMethod(char *method, int sockID)
 			badRequest((int) sockID);
 		}
 
+        shutdown(sockID, SHUT_RDWR);
 		close(sockID);
 		OK = -1;
 	}
@@ -48,6 +61,7 @@ void acceptPetition(long sockID)
 		notImplemented((int) sockID);
 	}
 
+    shutdown(sockID, SHUT_RDWR);
 	close((int) sockID);
 	pthread_exit(NULL);
 }
@@ -109,6 +123,7 @@ void sendDir(char *dr, int sockID)
 			send(sockID, buffer, sz, 0);
 		}
 		
+		shutdown(sockID, SHUT_RDWR);
 		close((int) sockID);
 		pthread_exit(NULL);
 	}

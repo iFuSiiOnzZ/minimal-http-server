@@ -1,13 +1,6 @@
 #ifndef _FUNCTIONS_H_
 	#define _FUNCTIONS_H_
 
-	#include <netinet/in.h>
-	#include <sys/stat.h>
-	#include <dirent.h>
-	#include <stdio.h>
-	#include <errno.h>
-	
-
 	#define HDR_URI_SZ      1024
 	#define HDR_METODE_SZ   5
 	#define HDR_VERSION_SZ  10

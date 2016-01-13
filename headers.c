@@ -1,5 +1,9 @@
 #include "headers.h"
 
+#include <stdio.h>
+#include <string.h>
+#include <netinet/in.h>
+
 void badRequest(int client)
 {
 	int sz = 0;
