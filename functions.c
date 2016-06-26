@@ -41,7 +41,7 @@ void acceptPetition(long sockID)
 	struct headers hdr;
 	getHeader(&hdr, (int)sockID);
 
-	if(requestMethod(hdr.metode, sockID) != -1)
+	if(requestMethod(hdr.method, sockID) != -1)
 	{	
 		if(getFDType(hdr.uri) == FILES)
 		{
@@ -150,11 +150,11 @@ void getHeader(struct headers *hdr, int sockID)
 	memset(hdr, 0, sizeof(struct headers));
 	getcwd(hdr->uri, HDR_URI_SZ);
 
-	for(i = 0; (i < HDR_METODE_SZ) && (recv(sockID, &c, 1, 0) > 0) && (c != ' ' && c != '\n'); i++)
+	for(i = 0; (i < HDR_METHOD_SZ) && (recv(sockID, &c, 1, 0) > 0) && (c != ' ' && c != '\n'); i++)
 	{
 		if(c != '\r')
 		{
-			hdr->metode[i] = c;
+			hdr->method[i] = c;
 		}
 	}
 

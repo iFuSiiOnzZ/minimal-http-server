@@ -2,7 +2,7 @@
 	#define _FUNCTIONS_H_
 
 	#define HDR_URI_SZ      1024
-	#define HDR_METODE_SZ   5
+	#define HDR_METHOD_SZ   5
 	#define HDR_VERSION_SZ  10
 
 	#define MAX_BUFFER      1024
@@ -13,7 +13,7 @@
 	struct headers
 	{
 	    char version[HDR_VERSION_SZ];
-	    char metode[HDR_METODE_SZ];
+	    char method[HDR_METHOD_SZ];
 	    char uri[HDR_URI_SZ];
 	};
 
