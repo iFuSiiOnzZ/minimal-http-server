@@ -1,16 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
+
 #include <string.h>
 #include <pthread.h>
 
-#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
-#include <fcntl.h>
 
-#include "headers.h"
 #include "functions.h"
-
 
 int main( int argc, char *argv[] )
 {
@@ -22,18 +19,15 @@ int main( int argc, char *argv[] )
     int socketLength            = 0;
     int socketPort              = 8080;
     
-    struct sockaddr_in  s_server;
-    struct sockaddr_in  s_client;
+    struct sockaddr_in  s_server = { 0 };
+    struct sockaddr_in  s_client = { 0 };
     
     if((socketDescriptor = socket(AF_INET, SOCK_STREAM, 0)) == -1)
     {
-        printf( "Error creating the socket\n" );
-        exit( EXIT_FAILURE );
+        printf("Error creating the socket\n");
+        return EXIT_FAILURE;
     }
-    
-    memset((void *)&s_client, 0, (size_t) sizeof(struct sockaddr_in));
-    memset((void *)&s_server, 0, (size_t) sizeof(struct sockaddr_in));
-    
+
     s_server.sin_family         = AF_INET;
     s_server.sin_addr.s_addr    = inet_addr("127.0.0.1");
     s_server.sin_port           = htons(socketPort);
@@ -41,13 +35,15 @@ int main( int argc, char *argv[] )
     if(bind(socketDescriptor, (struct sockaddr *) &s_server, (socklen_t) sizeof(struct sockaddr_in)) == -1)
     {
         printf("Error at associate port and socket!\n");
-        exit(EXIT_FAILURE);
+        close(socketDescriptor);
+        return EXIT_FAILURE;
     }
     
     if(listen(socketDescriptor, 5) == -1)
     {
         printf("Error at listen!\n");
-        exit(EXIT_FAILURE);
+        close(socketDescriptor);
+        return EXIT_FAILURE;
     }
 
     while(1)
@@ -63,5 +59,5 @@ int main( int argc, char *argv[] )
     }
 
     close(socketDescriptor);
-    pthread_exit(NULL);
+    return EXIT_SUCCESS;
 }
