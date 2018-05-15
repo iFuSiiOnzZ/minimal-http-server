@@ -1,6 +1,16 @@
+/*
+    Project includes
+*/
 #include "functions.h"
 #include "headers.h"
 
+/*
+    Lib includes
+*/
+
+/*
+    C includes
+*/
 #include <netinet/in.h>
 #include <sys/stat.h>
 
@@ -13,6 +23,8 @@
 #include <errno.h>
 #include <unistd.h>
 
+///////////////////////////////////////////////////////////////////////////////
+
 int requestMethod(char *method, int sockID)
 {
     if(!strcmp("GET", method))
@@ -22,11 +34,11 @@ int requestMethod(char *method, int sockID)
 
     if(!strcmp("POST", method))
     {
-        notImplemented(sockID);
+        http_not_implemented(sockID);
     }
     else
     {
-        badRequest(sockID);
+        http_bad_request(sockID);
     }
 
     return -1;
@@ -49,12 +61,12 @@ void acceptPetition(int sockID)
         }
         else
         {
-            notFound(sockID);
+            http_not_found(sockID);
         }
     }
     else
     {
-        notImplemented(sockID);
+        http_not_found(sockID);
     }
 
     shutdown(sockID, SHUT_RDWR);
@@ -70,13 +82,13 @@ void sendFile(char *file, int sockID)
     char buffer[MAX_BUFFER];
 
     memset(buffer, 0, MAX_BUFFER);
-    fileFound(sockID, cType(file));
+    http_ok(sockID, cType(file));
 
     if((pFile = fopen(file, "r")) == NULL)
     {
         if(errno == EACCES)
         {
-            forbidden(sockID);
+            http_forbidden(sockID);
         }
         else
         {
@@ -105,13 +117,13 @@ void sendDir(char *dr, int sockID)
     char curentDir[MAX_BUFFER] = { 0 };
 
 
-    fileFound((int) sockID, "text/html");
+    http_ok((int) sockID, "text/html");
 
     if((dir = opendir(dr)) == NULL )
     {
         if(errno == EACCES)
         {
-            forbidden(sockID);
+            http_forbidden(sockID);
         }
         else
         {

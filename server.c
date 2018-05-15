@@ -1,3 +1,15 @@
+/*
+    Project includes
+*/
+#include "functions.h"
+
+/*
+    Lib includes
+*/
+
+/*
+    C includes
+*/
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -7,7 +19,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
-#include "functions.h"
+///////////////////////////////////////////////////////////////////////////////
 
 int main( int argc, char *argv[] )
 {

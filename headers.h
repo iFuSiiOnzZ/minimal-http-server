@@ -1,12 +1,10 @@
 #ifndef _HEADERS_H_
     #define _HEADERS_H_
-    
-    #define MAX_BUFFER  1024
-    #define MAX_CTYPE   50
 
-    void fileFound(int client, char *cType);
-    void notImplemented(int client);
-    void badRequest(int client);
-    void forbidden(int client);
-    void notFound(int client);
+    void http_ok(int client, char *cType);
+    void http_not_found(int client);
+
+    void http_not_implemented(int client);
+    void http_bad_request(int client);
+    void http_forbidden(int client);
 #endif

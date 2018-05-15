@@ -1,10 +1,28 @@
+/*
+    Project includes
+*/
 #include "headers.h"
 
+/*
+    Lib includes
+*/
+
+/*
+    C includes
+*/
 #include <stdio.h>
 #include <string.h>
 #include <netinet/in.h>
 
-void badRequest(int client)
+/*
+    Defines
+*/
+#define MAX_BUFFER  1024
+#define MAX_CTYPE   50
+
+///////////////////////////////////////////////////////////////////////////////
+
+void http_bad_request(int client)
 {
     int sz = 0;
     char buf[MAX_BUFFER];
@@ -22,7 +40,7 @@ void badRequest(int client)
     send(client, buf, sz, 0);
 }
 
-void notImplemented(int client)
+void http_not_implemented(int client)
 {
     int sz = 0;
     char buf[MAX_BUFFER];
@@ -40,7 +58,7 @@ void notImplemented(int client)
     send(client, buf, sz, 0);
 }
 
-void forbidden(int client)
+void http_forbidden(int client)
 {
     int sz = 0;
     char buf[MAX_BUFFER];
@@ -58,7 +76,7 @@ void forbidden(int client)
     send(client, buf, sz, 0);
 }
 
-void notFound(int client)
+void http_not_found(int client)
 {
     int sz = 0;
     char buf[MAX_BUFFER];
@@ -76,7 +94,7 @@ void notFound(int client)
     send(client, buf, sz, 0);
 }
 
-void fileFound(int client, char *cType)
+void http_ok(int client, char *cType)
 {
     int sz = 0;
     char buf[MAX_BUFFER];
