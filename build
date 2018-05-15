@@ -1,13 +1,16 @@
 #!/bin/bash
 
+## Make build path
+mkdir -p ../bin
+
 ## App Name
-AppName='-o server'
+AppName='-o ../bin/server'
 
 ## Compiler
 CC='gcc'
 
 ## Libs
-Libs='-lpthread'
+Libs='-pthread'
 
 ## Source files
 SRCFiles=`find -regex '.*/.*\.\(c\|cpp\|h\)$' -print0 | xargs -0`

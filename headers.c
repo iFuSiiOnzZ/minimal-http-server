@@ -8,7 +8,6 @@ void badRequest(int client)
 {
     int sz = 0;
     char buf[MAX_BUFFER];
-    memset(buf, 0, (size_t) MAX_BUFFER);
 
     sz = snprintf(buf, (size_t) MAX_BUFFER, "HTTP/1.0 400 Bad Request\r\n");
     send(client, buf, sz, 0);
@@ -27,7 +26,6 @@ void notImplemented(int client)
 {
     int sz = 0;
     char buf[MAX_BUFFER];
-    memset(buf, 0, (size_t) MAX_BUFFER);
 
     sz = snprintf(buf, (size_t) MAX_BUFFER, "HTTP/1.0 501 Not Implemented\r\n");
     send(client, buf, sz, 0);
@@ -46,7 +44,6 @@ void forbidden(int client)
 {
     int sz = 0;
     char buf[MAX_BUFFER];
-    memset(buf, 0, (size_t) MAX_BUFFER);
 
     sz = snprintf(buf, (size_t) MAX_BUFFER, "HTTP/1.0 403 Forbidden\r\n");
     send(client, buf, sz, 0);
@@ -65,7 +62,6 @@ void notFound(int client)
 {
     int sz = 0;
     char buf[MAX_BUFFER];
-    memset(buf, 0, (size_t) MAX_BUFFER);
 
     sz = snprintf(buf, (size_t) MAX_BUFFER, "HTTP/1.0 404 File Not Found\r\n");
     send(client, buf, sz, 0);
@@ -82,9 +78,8 @@ void notFound(int client)
 
 void fileFound(int client, char *cType)
 {
-
     int sz = 0;
-    char buf[MAX_BUFFER];   memset(buf, 0, (size_t) MAX_BUFFER);
+    char buf[MAX_BUFFER];
 
     sz = snprintf(buf, (size_t) MAX_BUFFER, "HTTP/1.0 200 OK\r\n");
     send(client, buf, sz, 0);

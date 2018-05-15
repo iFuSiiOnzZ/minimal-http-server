@@ -11,8 +11,6 @@
 
 int main( int argc, char *argv[] )
 {
-
-
     int socketDescriptorClient  = 0;
     int socketDescriptor        = 0;
     pthread_t thread            = 0;

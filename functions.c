@@ -21,16 +21,13 @@ int requestMethod(char *method, int sockID)
     }
 
     if(!strcmp("POST", method))
-        notImplemented(sockID);
     {
+        notImplemented(sockID);
     }
     else
     {
         badRequest(sockID);
     }
-
-    shutdown(sockID, SHUT_RDWR);
-    close(sockID);
 
     return -1;
 }
@@ -87,8 +84,7 @@ void sendFile(char *file, int sockID)
             send(sockID, buffer, sz, 0);
         }
 
-        close(sockID);
-        pthread_exit(NULL);
+        return;
     }
     
     while((sz = fread(buffer, 1, MAX_BUFFER, pFile)) > 0)
@@ -122,11 +118,8 @@ void sendDir(char *dr, int sockID)
             sz = snprintf(buffer, MAX_BUFFER, "Error unexpected end of transmission");
             send(sockID, buffer, sz, 0);
         }
-        
-        shutdown(sockID, SHUT_RDWR);
-        close(sockID);
 
-        pthread_exit(NULL);
+        return;
     }
 
     getcwd(curentDir, MAX_BUFFER);
