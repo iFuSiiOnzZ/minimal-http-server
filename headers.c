@@ -110,14 +110,13 @@ void http_internal_server_error(int client)
     send(client, buf, sz, 0);
 }
 
-void http_ok(int client, char *cType)
+void http_ok(int client, const char *cType)
 {
     int sz = 0;
     char buf[MAX_BUFFER];
 
     sz = snprintf(buf, (size_t) MAX_BUFFER, "HTTP/1.0 200 OK\r\n");
     send(client, buf, sz, 0);
-
 
     sz = snprintf(buf, (size_t) MAX_BUFFER, "Content-Type: %s\r\n", cType);
     send(client, buf, sz, 0);

@@ -12,9 +12,9 @@
     C includes
 */
 #include <netinet/in.h>
+#include <sys/time.h>
 #include <sys/stat.h>
 
-#include <pthread.h>
 #include <string.h>
 
 #include <dirent.h>
@@ -51,7 +51,7 @@ typedef struct http_headers_t
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static int fnc_get_request_method(char *method, int sockID)
+static int fnc_get_request_method(char *method, int socketId)
 {
     if(!strcmp("GET", method))
     {
@@ -73,7 +73,7 @@ static int fnc_get_request_method(char *method, int sockID)
     return METHOD_OTHER;
 }
 
-static char *fnc_get_file_extension(char *fileName)
+static char *fnc_get_file_extension(const char *fileName)
 {
     char *fileExtension = strrchr(fileName, '.');
 
@@ -102,23 +102,23 @@ static char *fnc_get_file_extension(char *fileName)
     return "text/plain";
 }
 
-static void fnc_send_file(char *file, int sockID)
+static void fnc_send_file(const char *file, int socketId)
 {
     int sz = 0;
     FILE *pFile = NULL;
 
     char buffer[MAX_BUFFER];
-    http_ok(sockID, fnc_get_file_extension(file));
+    http_ok(socketId, fnc_get_file_extension(file));
 
     if((pFile = fopen(file, "r")) == NULL)
     {
         if(errno == EACCES)
         {
-            http_forbidden(sockID);
+            http_forbidden(socketId);
         }
         else
         {
-            http_internal_server_error(sockID);
+            http_internal_server_error(socketId);
         }
 
         return;
@@ -126,13 +126,13 @@ static void fnc_send_file(char *file, int sockID)
 
     while((sz = fread(buffer, 1, MAX_BUFFER, pFile)) > 0)
     {
-        send(sockID, buffer, sz, 0);
+        send(socketId, buffer, sz, 0);
     }
 
     fclose(pFile);
 }
 
-static void fnc_send_directory(char *directory, int sockID)
+static void fnc_send_directory(const char *directory, int socketId)
 {
     DIR *dir = NULL;
     struct dirent *myDir = NULL;
@@ -144,31 +144,31 @@ static void fnc_send_directory(char *directory, int sockID)
     {
         if(errno == EACCES)
         {
-            http_forbidden(sockID);
+            http_forbidden(socketId);
         }
         else
         {
-            http_internal_server_error(sockID);
+            http_internal_server_error(socketId);
         }
 
         return;
     }
 
-    http_ok((int) sockID, "text/html");
+    http_ok(socketId, "text/html");
 
     while((myDir = readdir(dir)) != NULL)
     {
         if(strcmp(myDir->d_name, ".") != 0 && strcmp(myDir->d_name, "..") != 0)
         {
             sz = snprintf(buffer, MAX_BUFFER, "<a href=\"%s/%s\">%s</a><br />", directory, myDir->d_name, myDir->d_name);
-            send(sockID, buffer, sz, 0);
+            send(socketId, buffer, sz, 0);
         }
     }
 
     closedir(dir);
 }
 
-static void fnc_parse_header(http_headers_t *hdr, int sockID)
+static void fnc_parse_header(http_headers_t *hdr, int socketId)
 {
     char buffer[MAX_BUFFER] = { 0 };
     int bytesReceived  = 0;
@@ -176,11 +176,11 @@ static void fnc_parse_header(http_headers_t *hdr, int sockID)
     struct timeval timeout = { 0  };
     timeout.tv_sec = 10;
 
-    setsockopt (sockID, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout));
+    setsockopt (socketId, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout));
 
     while(1)
     {
-        int recvBytes = recv(sockID, buffer + bytesReceived, MAX_BUFFER - bytesReceived, 0);
+        int recvBytes = recv(socketId, buffer + bytesReceived, MAX_BUFFER - bytesReceived, 0);
 
         if(recvBytes < 0)
         {
@@ -197,16 +197,11 @@ static void fnc_parse_header(http_headers_t *hdr, int sockID)
     }
 
     strcpy(hdr->method, strtok (buffer, " \r\n"));
-    printf("Method : %s\n", hdr->method);
-
     strcpy(hdr->uri, strtok(NULL, " \r\n"));
-    printf("Uri    : %s\n", hdr->uri);
-
     strcpy(hdr->version, strtok(NULL, " \r\n"));
-    printf("Version: %s\n\n", hdr->version);
 }
 
-static int fnc_get_path_type(char *path)
+static int fnc_get_path_type(const char *path)
 {
     struct stat st = { 0 };
 
@@ -215,11 +210,11 @@ static int fnc_get_path_type(char *path)
         return FD_ERROR;
     }
 
-    if(st.st_mode & S_IFDIR)
+    if(S_ISDIR(st.st_mode))
     {
         return FD_DIRS;
     }
-    else if(st.st_mode & S_IFREG)
+    else if(S_ISREG(st.st_mode))
     {
         return FD_FILES;
     }
@@ -227,39 +222,45 @@ static int fnc_get_path_type(char *path)
     return FD_OTHERS;
 }
 
-void fnc_process_request(int sockID)
+void fnc_process_request(int socketId)
 {
     http_headers_t hdr = { 0 };
-    fnc_parse_header(&hdr, sockID);
+    fnc_parse_header(&hdr, socketId);
 
-    if(fnc_get_request_method(hdr.method, sockID) == METHOD_GET)
+    printf("Method  : %s\n", hdr.method);
+    printf("Uri     : %s\n", hdr.uri);
+    printf("Version : %s\n", hdr.version);
+    printf("SocketId: %d\n\n", socketId);
+
+    if(fnc_get_request_method(hdr.method, socketId) != METHOD_GET)
     {
-        char curentDir[MAX_BUFFER];
-        getcwd(curentDir, MAX_BUFFER);
-
-        strncat(curentDir, hdr.uri, MAX_BUFFER - strlen(curentDir));
-        int pathType = fnc_get_path_type(curentDir);
-
-        if(pathType == FD_FILES)
-        {
-            fnc_send_file(curentDir, sockID);
-        }
-        else if(pathType == FD_DIRS)
-        {
-            fnc_send_directory(curentDir, sockID);
-        }
-        else
-        {
-            http_not_found(sockID);
-        }
-    }
-    else
-    {
-        http_not_implemented(sockID);
+        http_not_implemented(socketId);
+        goto close_connection;
     }
 
-    shutdown(sockID, SHUT_RDWR);
-    close(sockID);
+    char curentDir[MAX_BUFFER];
+    getcwd(curentDir, MAX_BUFFER);
+    strncat(curentDir, hdr.uri, MAX_BUFFER - strlen(curentDir));
 
-    pthread_exit(NULL);
+    switch (fnc_get_path_type(curentDir))
+    {
+        case FD_FILES:
+        {
+            fnc_send_file(curentDir, socketId);
+        } break;
+
+        case FD_DIRS:
+        {
+            fnc_send_directory(curentDir, socketId);
+        } break;
+
+        default:
+        {
+            http_not_found(socketId);
+        } break;
+    }
+
+close_connection:
+    shutdown(socketId, SHUT_RDWR);
+    close(socketId);
 }

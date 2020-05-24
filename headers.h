@@ -1,7 +1,7 @@
 #ifndef _HEADERS_H_
     #define _HEADERS_H_
 
-    void http_ok(int client, char *cType);
+    void http_ok(int client, const char *cType);
     void http_not_found(int client);
 
     void http_not_implemented(int client);
