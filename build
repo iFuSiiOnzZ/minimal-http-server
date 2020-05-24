@@ -16,4 +16,4 @@ Libs='-pthread'
 SRCFiles=`find -regex '.*/.*\.\(c\|cpp\|h\)$' -print0 | xargs -0`
 
 ## Compile
-eval "$CC $AppName $Libs $SRCFiles"
+eval "$CC -O0 -g -ggdb -fsanitize=thread $AppName $Libs $SRCFiles"
