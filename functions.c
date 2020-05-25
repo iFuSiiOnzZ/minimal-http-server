@@ -31,7 +31,8 @@
 #define HDR_VERSION_SZ  10
 
 #define MAX_BUFFER      1024
-#define HTM_INDEX       "index.htm"
+
+#define NumberOfElements(x) (sizeof(x) / sizeof((x)[0]))
 
 /*
     Enums
@@ -48,6 +49,36 @@ typedef struct http_headers_t
     char method[HDR_METHOD_SZ];
     char uri[HDR_URI_SZ];
 } http_headers_t;
+
+typedef struct mime_types_t
+{
+    const char *extension;
+    const char *type;
+} mime_types_t;
+
+/*
+    Global variables
+*/
+static mime_types_t gMimeTypes[] =
+{
+    { "htm" , "text/html" },
+    { "html", "text/html" },
+
+    { "scss", "text/x-scss" },
+    { "css" , "text/css"    },
+
+    { "jpg" , "image/jpeg" },
+    { "jpeg", "image/jpeg" },
+    { "bmp" , "image/bmp"  },
+    { "gif" , "image/gif"  },
+    { "png" , "image/png"  },
+
+    { "js" , "application/x-javascript" },
+
+    { "woff2", "font/woff2" },
+    { "woff" , "font/woff"  },
+    { "ttf"  , "font/ttf"   }
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -73,30 +104,19 @@ static int fnc_get_request_method(char *method, int socketId)
     return METHOD_OTHER;
 }
 
-static char *fnc_get_file_extension(const char *fileName)
+static const char *fnc_get_file_extension(const char *fileName)
 {
     char *fileExtension = strrchr(fileName, '.');
+    if (fileExtension == NULL) return "text/plain";;
 
-    if(fileExtension == NULL)
-    {
-        return "text/plain";
-    }
+    ++fileExtension;
 
-    if(!strcmp(fileExtension, "htm") || !strcmp(fileExtension, "html"))
+    for(size_t i = 0; i < NumberOfElements(gMimeTypes); ++i)
     {
-        return "text/html";
-    }
-    else if(!strcmp(fileExtension,"jpg") || !strcmp(fileExtension, "jpeg"))
-    {
-        return "image/jpeg";
-    }
-    else if(!strcmp(fileExtension,"gif"))
-    {
-        return "image/gif";
-    }
-    else if(!strcmp(fileExtension,"png"))
-    {
-        return "image/png";
+        if(!strcmp(fileExtension, gMimeTypes[i].extension))
+        {
+            return gMimeTypes[i].type;
+        }
     }
 
     return "text/plain";
@@ -132,7 +152,7 @@ static void fnc_send_file(const char *file, int socketId)
     fclose(pFile);
 }
 
-static void fnc_send_directory(const char *directory, int socketId)
+static void fnc_send_directory(const char *directory, const char *httpPath, int socketId)
 {
     DIR *dir = NULL;
     struct dirent *myDir = NULL;
@@ -155,12 +175,18 @@ static void fnc_send_directory(const char *directory, int socketId)
     }
 
     http_ok(socketId, "text/html");
+    const char *httpFilePath = directory + strlen(httpPath);
+
+    if (!strcmp(httpFilePath, "/"))
+    {
+        httpFilePath = "";
+    }
 
     while((myDir = readdir(dir)) != NULL)
     {
         if(strcmp(myDir->d_name, ".") != 0 && strcmp(myDir->d_name, "..") != 0)
         {
-            sz = snprintf(buffer, MAX_BUFFER, "<a href=\"%s/%s\">%s</a><br />", directory, myDir->d_name, myDir->d_name);
+            sz = snprintf(buffer, MAX_BUFFER, "<a href=\"%s/%s\">%s</a><br />", httpFilePath, myDir->d_name, myDir->d_name);
             send(socketId, buffer, sz, 0);
         }
     }
@@ -174,7 +200,7 @@ static void fnc_parse_header(http_headers_t *hdr, int socketId)
     int bytesReceived  = 0;
 
     struct timeval timeout = { 0  };
-    timeout.tv_sec = 10;
+    timeout.tv_sec = 1;
 
     setsockopt (socketId, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout));
 
@@ -196,9 +222,14 @@ static void fnc_parse_header(http_headers_t *hdr, int socketId)
         }
     }
 
-    strcpy(hdr->method, strtok (buffer, " \r\n"));
-    strcpy(hdr->uri, strtok(NULL, " \r\n"));
-    strcpy(hdr->version, strtok(NULL, " \r\n"));
+    char *saveptr = NULL, *data = strtok_r(buffer, " \r\n", &saveptr);
+    strcpy(hdr->method, data);
+
+    data = strtok_r(NULL, " \r\n", &saveptr);
+    strcpy(hdr->uri, data);
+
+    data = strtok_r(NULL, " \r\n", &saveptr);
+    strcpy(hdr->version, data);
 }
 
 static int fnc_get_path_type(const char *path)
@@ -227,10 +258,12 @@ void fnc_process_request(int socketId)
     http_headers_t hdr = { 0 };
     fnc_parse_header(&hdr, socketId);
 
+    /*
     printf("Method  : %s\n", hdr.method);
     printf("Uri     : %s\n", hdr.uri);
     printf("Version : %s\n", hdr.version);
     printf("SocketId: %d\n\n", socketId);
+    */
 
     if(fnc_get_request_method(hdr.method, socketId) != METHOD_GET)
     {
@@ -238,20 +271,22 @@ void fnc_process_request(int socketId)
         goto close_connection;
     }
 
-    char curentDir[MAX_BUFFER];
-    getcwd(curentDir, MAX_BUFFER);
-    strncat(curentDir, hdr.uri, MAX_BUFFER - strlen(curentDir));
+    char currentDir[MAX_BUFFER], httpPath[MAX_BUFFER];
+    getcwd(httpPath, MAX_BUFFER);
 
-    switch (fnc_get_path_type(curentDir))
+    strncpy(currentDir, httpPath, MAX_BUFFER);
+    strncat(currentDir, hdr.uri, MAX_BUFFER - strlen(currentDir));
+
+    switch (fnc_get_path_type(currentDir))
     {
         case FD_FILES:
         {
-            fnc_send_file(curentDir, socketId);
+            fnc_send_file(currentDir, socketId);
         } break;
 
         case FD_DIRS:
         {
-            fnc_send_directory(curentDir, socketId);
+            fnc_send_directory(currentDir, httpPath, socketId);
         } break;
 
         default:
