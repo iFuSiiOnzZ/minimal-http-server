@@ -23,6 +23,16 @@
 #include <unistd.h>
 
 /*
+    Defines and Enums
+*/
+
+// Prevents the compiler from reordering memory operations
+#define __compiler_barrier() __asm__ __volatile__ ("" : : : "memory")
+
+// Full memory barrier (includes compiler barriers for safety)
+#define __memory_barrier() { __compiler_barrier(); __sync_synchronize(); __compiler_barrier(); }
+
+/*
     Data structures
 */
 typedef void (*http_process_fnc_t)(int arg);
@@ -30,7 +40,6 @@ typedef void (*http_process_fnc_t)(int arg);
 typedef struct thread_pool_task_t
 {
     struct thread_pool_task_t *next;
-    http_process_fnc_t httpCallBack;
     int socketId;
 } thread_pool_task_t;
 
@@ -46,17 +55,43 @@ typedef struct thread_pool_t
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static inline size_t atomic_read(volatile size_t *ptr)
+static inline size_t __atomic_read(volatile size_t *ptr)
 {
     return __sync_add_and_fetch(ptr, 0);
 }
 
-static thread_pool_task_t *thread_pool_create_task(http_process_fnc_t httpCallBack, int socketId)
+static inline size_t __atomic_add(volatile size_t *ptr, size_t inc)
+{
+    return __sync_add_and_fetch(ptr, inc);
+}
+
+static inline size_t __atomic_sub(volatile size_t *ptr, size_t inc)
+{
+    return __sync_sub_and_fetch(ptr, inc);
+}
+
+static inline size_t __atomic_inc(volatile size_t *ptr)
+{
+    return __atomic_add(ptr, 1);
+}
+
+static inline size_t __atomic_dec(volatile size_t *ptr)
+{
+    return __atomic_sub(ptr, 1);
+}
+
+static inline size_t __atomic_cmp(volatile size_t *ptr, size_t cmp)
+{
+    return __atomic_read(ptr) == cmp;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+static thread_pool_task_t *thread_pool_create_task(int socketId)
 {
     thread_pool_task_t *job = (thread_pool_task_t *) malloc(sizeof(thread_pool_task_t));
     assert(job != NULL && "Can not reserve memory!");
 
-    job->httpCallBack = httpCallBack;
     job->socketId = socketId;
     job->next = NULL;
 
@@ -86,14 +121,14 @@ static thread_pool_task_t *thread_pool_get_job(thread_pool_t *pool)
         pool->lastTask = NULL;
     }
 
-    __sync_sub_and_fetch(&pool->numberOfJobsInQueue, 1);
+    __atomic_dec(&pool->numberOfJobsInQueue);
     return job;
 }
 
-static void thread_pool_add_task(thread_pool_t *pool, http_process_fnc_t callBack, int socketId)
+static void thread_pool_add_task(thread_pool_t *pool, int socketId)
 {
-    if(pool == NULL || callBack == NULL || atomic_read(&pool->stop) == 1) { return; }
-    thread_pool_task_t *task = thread_pool_create_task(callBack, socketId);
+    if(pool == NULL || __atomic_cmp(&pool->stop, 1)) { return; }
+    thread_pool_task_t *task = thread_pool_create_task(socketId);
 
     pthread_mutex_lock(&pool->mutex);
         if(pool->firstTask == NULL)
@@ -108,7 +143,7 @@ static void thread_pool_add_task(thread_pool_t *pool, http_process_fnc_t callBac
         }
     pthread_mutex_unlock(&pool->mutex);
 
-    __sync_add_and_fetch(&pool->numberOfJobsInQueue, 1);
+    __atomic_inc(&pool->numberOfJobsInQueue);
     pthread_cond_broadcast(&pool->condNewTask);
 }
 
@@ -119,12 +154,12 @@ static void *thread_pool_worker(void *arg)
     while(1)
     {
         pthread_mutex_lock(&pool->mutex);
-            while(pool->firstTask == NULL && atomic_read(&pool->stop) == 0)
+            while(pool->firstTask == NULL && __atomic_cmp(&pool->stop, 0))
             {
                 pthread_cond_wait(&pool->condNewTask, &pool->mutex);
             }
 
-            if(atomic_read(&pool->stop) == 1 && atomic_read(&pool->numberOfJobsInQueue) == 0)
+            if(__atomic_cmp(&pool->stop, 1) && __atomic_cmp(&pool->numberOfJobsInQueue, 0))
             {
                 pthread_mutex_unlock(&pool->mutex);
                 break;
@@ -135,13 +170,13 @@ static void *thread_pool_worker(void *arg)
 
         if(job != NULL)
         {
-            __sync_add_and_fetch(&pool->numberOfRunningTasks, 1);
-                job->httpCallBack(job->socketId);
+            __atomic_inc(&pool->numberOfRunningTasks);
+                fnc_process_request(job->socketId);
                 thread_pool_destroy_job(job);
-            __sync_sub_and_fetch(&pool->numberOfRunningTasks, 1);
+            __atomic_dec(&pool->numberOfRunningTasks);
         }
 
-        if(atomic_read(&pool->numberOfJobsInQueue) == 0 && atomic_read(&pool->numberOfRunningTasks) == 0)
+        if(__atomic_cmp(&pool->numberOfJobsInQueue, 0) && __atomic_cmp(&pool->numberOfRunningTasks, 0))
         {
             pthread_cond_signal(&pool->condAllTaskCompleted);
         }
@@ -176,13 +211,8 @@ static thread_pool_t *thread_pool_create(size_t numberOfThreads)
 
 static void thread_pool_wait(thread_pool_t *pool)
 {
-    if(pool == NULL)
-    {
-        return;
-    }
-
     pthread_mutex_lock(&pool->mutex);
-        while(atomic_read(&pool->numberOfRunningTasks) != 0 || atomic_read(&pool->numberOfJobsInQueue) != 0)
+        while(pool->numberOfRunningTasks != 0 || pool->numberOfJobsInQueue != 0)
         {
             pthread_cond_broadcast(&pool->condNewTask);
             pthread_cond_wait(&pool->condAllTaskCompleted, &pool->mutex);
@@ -192,12 +222,7 @@ static void thread_pool_wait(thread_pool_t *pool)
 
 static void thread_pool_destroy(thread_pool_t *pool)
 {
-    if(pool == NULL)
-    {
-        return;
-    }
-
-    __sync_lock_test_and_set(&pool->stop, 1);
+    pool->stop = 1;
     thread_pool_wait(pool);
 
     pthread_mutex_destroy(&pool->mutex);
@@ -211,10 +236,8 @@ static void thread_pool_destroy(thread_pool_t *pool)
 
 int main( int argc, char *argv[] )
 {
-    int socketDescriptorClient  = 0;
-    int socketDescriptor        = 0;
-    int socketLength            = 0;
-    int socketPort              = 8080;
+    int socketDescriptor = 0;
+    int socketPort       = 8080;
 
     struct sockaddr_in  s_server = { 0 };
     struct sockaddr_in  s_client = { 0 };
@@ -251,10 +274,12 @@ int main( int argc, char *argv[] )
 
     while(1)
     {
-        socketLength = sizeof(struct sockaddr_in);
-        if((socketDescriptorClient = accept(socketDescriptor, (struct sockaddr *) &s_client, &socketLength)) != -1)
+        unsigned int socketLength = sizeof(struct sockaddr_in);
+        int socketDescriptorClient = accept(socketDescriptor, (struct sockaddr *) &s_client, &socketLength);
+
+        if(socketDescriptorClient != -1)
         {
-            thread_pool_add_task(pool, (void *) &fnc_process_request, socketDescriptorClient);
+            thread_pool_add_task(pool, socketDescriptorClient);
         }
     }
 
