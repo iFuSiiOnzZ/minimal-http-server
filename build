@@ -13,7 +13,7 @@ CC='gcc'
 Libs='-pthread'
 
 ## Source files
-SRCFiles=`find -regex '.*/.*\.\(c\|cpp\|h\)$' -print0 | xargs -0`
+SRCFiles=`find -regex '.*/.*\.\(c\|h\)$' -print0 | xargs -0`
 
 ## Compile
-eval "$CC -O0 -g -ggdb -fsanitize=thread $AppName $Libs $SRCFiles"
+eval "$CC -O0 -g -ggdb -Wall -fsanitize=thread $AppName $Libs $SRCFiles"
