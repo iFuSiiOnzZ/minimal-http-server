@@ -14,6 +14,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <errno.h>
+#include <dirent.h>
+
 #include <signal.h>
 #include <assert.h>
 
@@ -84,10 +87,28 @@ static inline size_t __atomic_cmp(volatile size_t *ptr, size_t cmp)
     return __atomic_read(ptr) == cmp;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 void fnc_release_socket(int socketId)
 {
     shutdown(socketId, SHUT_RDWR);
     close(socketId);
+}
+
+int fnc_read_dir(void *__dir, dirent_t *__data)
+{
+    struct dirent *dir = readdir(__dir);
+    if (dir == NULL) return 0;
+
+    __data->d_name = dir->d_name;
+    __data->d_type = dir->d_type;
+
+    return 1;
+}
+
+int fnc_errno()
+{
+    return *__errno_location();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -160,6 +181,13 @@ static void *thread_pool_worker(void *arg)
     platform.networkAPI.send = send;
     platform.networkAPI.recv = recv;
     platform.networkAPI.release = fnc_release_socket;
+
+    platform.dirAPI.getcwd = getcwd;
+    platform.dirAPI.readdir = fnc_read_dir;
+    platform.dirAPI.opendir = (void * (*)(const char *))opendir;
+    platform.dirAPI.closedir = (int (*)(void *))closedir;
+
+    platform.getLastError = fnc_errno;
 
     while(1)
     {

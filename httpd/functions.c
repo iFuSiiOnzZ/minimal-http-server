@@ -11,18 +11,9 @@
 /*
     C includes
 */
-#include <netinet/in.h>
-#include <sys/time.h>
 #include <sys/stat.h>
-
 #include <string.h>
-
-#include <dirent.h>
 #include <stdio.h>
-
-#include <errno.h>
-#include <unistd.h>
-
 /*
     Defines
 */
@@ -132,7 +123,7 @@ static void fnc_send_file(const char *file, int socketId, platform_t *platform)
 
     if((pFile = fopen(file, "r")) == NULL)
     {
-        if(errno == EACCES)
+        if(platform->getLastError() == ERROR_EACCES)
         {
             http_forbidden(socketId, platform);
         }
@@ -154,15 +145,12 @@ static void fnc_send_file(const char *file, int socketId, platform_t *platform)
 
 static void fnc_send_directory(const char *directory, const char *httpPath, int socketId, platform_t *platform)
 {
-    DIR *dir = NULL;
-    struct dirent *myDir = NULL;
+    void *dir = NULL;
+    dirent_t myContent = { };
 
-    int sz = 0;
-    char buffer[MAX_BUFFER] = { 0 };
-
-    if((dir = opendir(directory)) == NULL )
+    if((dir = platform->dirAPI.opendir(directory)) == NULL )
     {
-        if(errno == EACCES)
+        if(platform->getLastError() == ERROR_EACCES)
         {
             http_forbidden(socketId, platform);
         }
@@ -182,16 +170,19 @@ static void fnc_send_directory(const char *directory, const char *httpPath, int 
         httpFilePath = "";
     }
 
-    while((myDir = readdir(dir)) != NULL)
+    int sz = 0;
+    char buffer[MAX_BUFFER] = { 0 };
+
+    while(platform->dirAPI.readdir(dir, &myContent))
     {
-        if(strcmp(myDir->d_name, ".") != 0 && strcmp(myDir->d_name, "..") != 0)
+        if(strcmp(myContent.d_name, ".") != 0 && strcmp(myContent.d_name, "..") != 0)
         {
-            sz = snprintf(buffer, MAX_BUFFER, "<a href=\"%s/%s\">%s</a><br />", httpFilePath, myDir->d_name, myDir->d_name);
+            sz = snprintf(buffer, MAX_BUFFER, "<a href=\"%s/%s\">%s</a><br />", httpFilePath, myContent.d_name, myContent.d_name);
             platform->networkAPI.send(socketId, buffer, sz, 0);
         }
     }
 
-    closedir(dir);
+    platform->dirAPI.closedir(dir);
 }
 
 static void fnc_parse_header(http_headers_t *hdr, int socketId, platform_t *platform)
@@ -267,7 +258,7 @@ void fnc_process_request(int socketId, platform_t *platform)
     }
 
     char currentDir[MAX_BUFFER], httpPath[MAX_BUFFER];
-    getcwd(httpPath, MAX_BUFFER);
+    platform->dirAPI.getcwd(httpPath, MAX_BUFFER);
 
     strncpy(currentDir, httpPath, MAX_BUFFER);
     strncat(currentDir, hdr.uri, MAX_BUFFER - strlen(currentDir));
