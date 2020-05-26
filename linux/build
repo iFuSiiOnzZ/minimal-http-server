@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# Useful variables
+LOCAL_PATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+FILE_N=`basename "$0"`
+
+# --------------------------------------------
+# Messages and Errors
+# --------------------------------------------
+BUILD_TYPE=Release
+
+# --------------------------------------------
+# Messages and Errors
+# --------------------------------------------
+error_build_type_not_defined()
+{
+    echo "$FILE_N [ERROR] Unrecognize build type!"
+    echo "$FILE_N [INFO] Allowed values are: 'Release' or 'Debug'"
+    exit 1
+}
+
+fnc_help()
+{
+    echo "$FILE_N [-h|--help] [--build-type=Release|Debug] "
+    echo "$FILE_N by default:  --build-type=Release"
+    exit 0
+}
+
+# --------------------------------------------
+# Parse arguments
+# --------------------------------------------
+for i in $@; do
+    case $1 in
+        --build-type=*)     BUILD_TYPE="${i#*=}"; shift;;
+        -h|--help)          fnc_help; shift;;
+    esac
+done
+
+# --------------------------------------------
+# Check if arguments are valid
+# --------------------------------------------
+if [ $BUILD_TYPE != Release ] && [ $BUILD_TYPE != Debug ]; then
+    error_build_type_not_defined
+fi
+
+# --------------------------------------------
+# Build the project
+# --------------------------------------------
+
+buildPath=$LOCAL_PATH/../../bin
+prgName=$buildPath/httpd
+mkdir -p "$buildPath"
+
+if [ $BUILD_TYPE = Release ]; then
+    gcc -O2 -Wall -o $prgName -pthread build.c
+else
+    gcc -O0 -g -ggdb -Wall  -fsanitize=thread -o $prgName -pthread build.c
+fi

@@ -1,7 +1,8 @@
 /*
     Project includes
 */
-#include "functions.h"
+#include "../httpd/platform.h"
+#include "../httpd/functions.h"
 
 /*
     Lib includes
@@ -35,8 +36,6 @@
 /*
     Data structures
 */
-typedef void (*http_process_fnc_t)(int arg);
-
 typedef struct thread_pool_task_t
 {
     struct thread_pool_task_t *next;
@@ -83,6 +82,12 @@ static inline size_t __atomic_dec(volatile size_t *ptr)
 static inline size_t __atomic_cmp(volatile size_t *ptr, size_t cmp)
 {
     return __atomic_read(ptr) == cmp;
+}
+
+void fnc_release_socket(int socketId)
+{
+    shutdown(socketId, SHUT_RDWR);
+    close(socketId);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -150,6 +155,11 @@ static void thread_pool_add_task(thread_pool_t *pool, int socketId)
 static void *thread_pool_worker(void *arg)
 {
     thread_pool_t *pool = (thread_pool_t *)arg;
+    platform_t platform = {};
+
+    platform.networkAPI.send = send;
+    platform.networkAPI.recv = recv;
+    platform.networkAPI.release = fnc_release_socket;
 
     while(1)
     {
@@ -171,7 +181,7 @@ static void *thread_pool_worker(void *arg)
         if(job != NULL)
         {
             __atomic_inc(&pool->numberOfRunningTasks);
-                fnc_process_request(job->socketId);
+                fnc_process_request(job->socketId, &platform);
                 thread_pool_destroy_job(job);
             __atomic_dec(&pool->numberOfRunningTasks);
         }

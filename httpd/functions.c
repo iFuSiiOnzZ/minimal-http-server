@@ -82,7 +82,7 @@ static mime_types_t gMimeTypes[] =
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static int fnc_get_request_method(char *method, int socketId)
+static int fnc_get_request_method(char *method)
 {
     if(!strcmp("GET", method))
     {
@@ -122,23 +122,23 @@ static const char *fnc_get_file_extension(const char *fileName)
     return "text/plain";
 }
 
-static void fnc_send_file(const char *file, int socketId)
+static void fnc_send_file(const char *file, int socketId, platform_t *platform)
 {
     int sz = 0;
     FILE *pFile = NULL;
 
     char buffer[MAX_BUFFER];
-    http_ok(socketId, fnc_get_file_extension(file));
+    http_ok(socketId, fnc_get_file_extension(file), platform);
 
     if((pFile = fopen(file, "r")) == NULL)
     {
         if(errno == EACCES)
         {
-            http_forbidden(socketId);
+            http_forbidden(socketId, platform);
         }
         else
         {
-            http_internal_server_error(socketId);
+            http_internal_server_error(socketId, platform);
         }
 
         return;
@@ -146,13 +146,13 @@ static void fnc_send_file(const char *file, int socketId)
 
     while((sz = fread(buffer, 1, MAX_BUFFER, pFile)) > 0)
     {
-        send(socketId, buffer, sz, 0);
+        platform->networkAPI.send(socketId, buffer, sz, 0);
     }
 
     fclose(pFile);
 }
 
-static void fnc_send_directory(const char *directory, const char *httpPath, int socketId)
+static void fnc_send_directory(const char *directory, const char *httpPath, int socketId, platform_t *platform)
 {
     DIR *dir = NULL;
     struct dirent *myDir = NULL;
@@ -164,17 +164,17 @@ static void fnc_send_directory(const char *directory, const char *httpPath, int 
     {
         if(errno == EACCES)
         {
-            http_forbidden(socketId);
+            http_forbidden(socketId, platform);
         }
         else
         {
-            http_internal_server_error(socketId);
+            http_internal_server_error(socketId, platform);
         }
 
         return;
     }
 
-    http_ok(socketId, "text/html");
+    http_ok(socketId, "text/html", platform);
     const char *httpFilePath = directory + strlen(httpPath);
 
     if (!strcmp(httpFilePath, "/"))
@@ -187,26 +187,21 @@ static void fnc_send_directory(const char *directory, const char *httpPath, int 
         if(strcmp(myDir->d_name, ".") != 0 && strcmp(myDir->d_name, "..") != 0)
         {
             sz = snprintf(buffer, MAX_BUFFER, "<a href=\"%s/%s\">%s</a><br />", httpFilePath, myDir->d_name, myDir->d_name);
-            send(socketId, buffer, sz, 0);
+            platform->networkAPI.send(socketId, buffer, sz, 0);
         }
     }
 
     closedir(dir);
 }
 
-static void fnc_parse_header(http_headers_t *hdr, int socketId)
+static void fnc_parse_header(http_headers_t *hdr, int socketId, platform_t *platform)
 {
     char buffer[MAX_BUFFER] = { 0 };
     int bytesReceived  = 0;
 
-    struct timeval timeout = { 0  };
-    timeout.tv_sec = 1;
-
-    setsockopt (socketId, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout));
-
     while(1)
     {
-        int recvBytes = recv(socketId, buffer + bytesReceived, MAX_BUFFER - bytesReceived, 0);
+        int recvBytes = platform->networkAPI.recv(socketId, buffer + bytesReceived, MAX_BUFFER - bytesReceived, 0);
 
         if(recvBytes < 0)
         {
@@ -253,10 +248,10 @@ static int fnc_get_path_type(const char *path)
     return FD_OTHERS;
 }
 
-void fnc_process_request(int socketId)
+void fnc_process_request(int socketId, platform_t *platform)
 {
     http_headers_t hdr = { 0 };
-    fnc_parse_header(&hdr, socketId);
+    fnc_parse_header(&hdr, socketId, platform);
 
     /*
     printf("Method  : %s\n", hdr.method);
@@ -265,9 +260,9 @@ void fnc_process_request(int socketId)
     printf("SocketId: %d\n\n", socketId);
     */
 
-    if(fnc_get_request_method(hdr.method, socketId) != METHOD_GET)
+    if(fnc_get_request_method(hdr.method) != METHOD_GET)
     {
-        http_not_implemented(socketId);
+        http_not_implemented(socketId, platform);
         goto close_connection;
     }
 
@@ -281,21 +276,20 @@ void fnc_process_request(int socketId)
     {
         case FD_FILES:
         {
-            fnc_send_file(currentDir, socketId);
+            fnc_send_file(currentDir, socketId, platform);
         } break;
 
         case FD_DIRS:
         {
-            fnc_send_directory(currentDir, httpPath, socketId);
+            fnc_send_directory(currentDir, httpPath, socketId, platform);
         } break;
 
         default:
         {
-            http_not_found(socketId);
+            http_not_found(socketId, platform);
         } break;
     }
 
 close_connection:
-    shutdown(socketId, SHUT_RDWR);
-    close(socketId);
+    platform->networkAPI.release(socketId);
 }
