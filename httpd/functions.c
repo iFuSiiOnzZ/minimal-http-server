@@ -25,6 +25,12 @@
 
 #define NumberOfElements(x) (sizeof(x) / sizeof((x)[0]))
 
+#if defined(_WIN32)
+    #define strtok_r strtok_s
+    #define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+    #define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
+
 /*
     Enums
 */
@@ -100,6 +106,7 @@ static const char *fnc_get_file_extension(const char *fileName)
     char *fileExtension = strrchr(fileName, '.');
     if (fileExtension == NULL) return "text/plain";;
 
+    // NOTE(Andrei): Remove the dot
     ++fileExtension;
 
     for(size_t i = 0; i < NumberOfElements(gMimeTypes); ++i)
@@ -115,13 +122,13 @@ static const char *fnc_get_file_extension(const char *fileName)
 
 static void fnc_send_file(const char *file, int socketId, platform_t *platform)
 {
-    int sz = 0;
+    size_t sz = 0;
     FILE *pFile = NULL;
 
     char buffer[MAX_BUFFER];
     http_ok(socketId, fnc_get_file_extension(file), platform);
 
-    if((pFile = fopen(file, "r")) == NULL)
+    if((pFile = fopen(file, "rb")) == NULL)
     {
         if(platform->getLastError() == ERROR_EACCES)
         {
@@ -146,7 +153,7 @@ static void fnc_send_file(const char *file, int socketId, platform_t *platform)
 static void fnc_send_directory(const char *directory, const char *httpPath, int socketId, platform_t *platform)
 {
     void *dir = NULL;
-    dirent_t myContent = { };
+    dirent_t myContent;
 
     if((dir = platform->dirAPI.opendir(directory)) == NULL )
     {
