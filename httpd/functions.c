@@ -215,6 +215,11 @@ static void fnc_parse_header(http_headers_t *hdr, int socketId, platform_t *plat
         }
     }
 
+    if (bytesReceived <= 0)
+    {
+        return;
+    }
+
     char *saveptr = NULL, *data = strtok_r(buffer, " \r\n", &saveptr);
     strcpy(hdr->method, data);
 
