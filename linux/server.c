@@ -116,7 +116,7 @@ int fnc_errno()
 static thread_pool_task_t *thread_pool_create_task(int socketId)
 {
     thread_pool_task_t *job = (thread_pool_task_t *) malloc(sizeof(thread_pool_task_t));
-    assert(job != NULL && "Can not reserve memory!");
+    assert(job != NULL && "Can not reserve memory for the task");
 
     job->socketId = socketId;
     job->next = NULL;
@@ -231,8 +231,10 @@ static thread_pool_t *thread_pool_create(size_t numberOfThreads)
     }
 
     thread_pool_t *pool = (thread_pool_t *)malloc(sizeof(thread_pool_t));
+    assert(pool != NULL && "Can not reserve memory for the pool");
     memset(pool, 0, sizeof(thread_pool_t));
 
+    pthread_cond_init(&pool->condAllTaskCompleted, NULL);
     pthread_cond_init(&pool->condNewTask, NULL);
     pthread_mutex_init(&pool->mutex, NULL);
 
